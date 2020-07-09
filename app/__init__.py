@@ -1,7 +1,7 @@
 import random
 import string
 
-from flask import Flask, request, jsonify, redirect, render_template
+from flask import Flask, request, jsonify, redirect, render_template, url_for
 from flask_sqlalchemy import SQLAlchemy
 from flask_migrate import Migrate
 from app.config import Config
@@ -31,30 +31,33 @@ def create_app(config_class=Config):
         if long_url.find("http://") == -1 and long_url.find("https://") == -1:
             long_url = "http://" + long_url
 
-        id = data["slug"] or ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
+        slug = data["slug"] or ''.join(random.choices(string.ascii_uppercase + string.digits, k=5))
 
-        if URL.query.filter_by(slug=id).first():
-            return jsonify(), 500
+        if URL.query.filter_by(slug=slug).first():
+            return jsonify("error - slug already in use"), 500
         else:
-            db_url = URL(slug=id, url=long_url)
+            db_url = URL(slug=slug, url=long_url)
             db.session.add(db_url)
             db.session.commit()
 
-        print(long_url, id)
+        print(long_url, slug)
 
         resp = {
             "url": long_url,
-            "slug": id,
-            "short": "/"+id
+            "slug": slug,
+            "short": url_for("url", slug=slug, _external=True)
         }
 
         return jsonify(resp)
 
     @app.route("/<slug>")
     def url(slug):
-        long_url = URL.query.filter_by(slug=slug).first().url
-        print(long_url)
+        url_obj = URL.query.filter_by(slug=slug).first()
 
-        return redirect(long_url)
+        if url_obj:
+            long_url = url_obj.url
+            return redirect(long_url)
+
+        return jsonify(), 200
 
     return app
